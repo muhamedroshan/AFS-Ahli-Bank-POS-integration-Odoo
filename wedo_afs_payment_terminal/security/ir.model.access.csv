@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_wedo_afs_payment_terminal_wedo_afs_payment_terminal,wedo_afs_payment_terminal.wedo_afs_payment_terminal,model_wedo_afs_payment_terminal_wedo_afs_payment_terminal,base.group_user,1,1,1,1
