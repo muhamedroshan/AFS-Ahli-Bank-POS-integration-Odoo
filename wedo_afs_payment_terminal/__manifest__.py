@@ -16,7 +16,7 @@ This module allows customers to connect their AFS payment terminal in Oman to Od
     # Check https://github.com/odoo/odoo/blob/15.0/odoo/addons/base/data/ir_module_category_data.xml
     # for the full list
     'category': 'Sales/Point of Sale',
-    'version': '0.1',
+    'version': '0.2',
 
     # any module necessary for this one to work correctly
     'depends': ['point_of_sale'],
@@ -26,10 +26,7 @@ This module allows customers to connect their AFS payment terminal in Oman to Od
         # 'security/ir.model.access.csv',
         'views/pos_payment_method_views.xml',
     ],
-    # only loaded in demonstration mode
-    'demo': [
-        'demo/demo.xml',
-    ],
+
     'assets': {
         'point_of_sale._assets_pos': [
             'wedo_afs_payment_terminal/static/src/**/*',

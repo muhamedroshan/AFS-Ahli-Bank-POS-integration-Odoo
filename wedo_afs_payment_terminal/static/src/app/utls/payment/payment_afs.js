@@ -3,7 +3,6 @@
 import { _t } from "@web/core/l10n/translation";
 import { PaymentInterface } from "@point_of_sale/app/utils/payment/payment_interface";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
-import { serializeDateTime } from "@web/core/l10n/dates";
 import { register_payment_method } from "@point_of_sale/app/services/pos_store";
 
 export class PaymentAFS extends PaymentInterface {
@@ -56,10 +55,10 @@ export class PaymentAFS extends PaymentInterface {
     async sendPaymentCancel(order, uuid) {
         await super.sendPaymentCancel(...arguments);
         if (this.afs_transaction_in_progress) {
-            //await this._afsCancelPaymentRequest();
             this.afs_transaction_in_progress = false;
+            await this._afsCancelPaymentRequest();
             this.afs_transaction_id = null;
-            this._showInfo(_t("Cancel payment from terminal device"));
+            this._showInfo(_t("Payment Request Cancelled"));
         }
     }
 
@@ -69,8 +68,8 @@ export class PaymentAFS extends PaymentInterface {
         const paymentLine = line;
         let result = { status: 'pending' };
         let pollCount = 0;
-        const maxPolls = 3; // Poll for 30 seconds (30 * 1000ms / 1000ms interval)
-        const pollInterval = 1000; // 1 second
+        const maxPolls = 2; // Poll for 30 seconds (30 * 1000ms / 1000ms interval)
+        const pollInterval = 500; // 1 second
 
         // Start the payment request
         const initialRequest = await this._afsFetchPaymentStatus(paymentLine);
@@ -78,7 +77,6 @@ export class PaymentAFS extends PaymentInterface {
             console.log("Error in initial request for status fetch")
             console.log({ message: initialRequest.message })
             this.sendPaymentCancel(order, uuid);
-            // this._showError({ message: initialRequest.message });
             return false;
         } else if (initialRequest.status === 'polling') {
             result.status = 'polling';
@@ -93,7 +91,6 @@ export class PaymentAFS extends PaymentInterface {
                 console.log("Error in status fetch")
                 console.log({ message: result.message })
                 this.sendPaymentCancel(order, uuid);
-                //this._showError({ message: result.message });
                 return false;
             }
         }
@@ -104,8 +101,7 @@ export class PaymentAFS extends PaymentInterface {
             console.log("payment time out")
             this.sendPaymentCancel(order, uuid); // Attempt to cancel if timed out
             return false;
-        } else {
-            this._showError({ message: _t("An unknown error occurred during payment.") });
+        } else { //Unknown Error
             this.sendPaymentCancel(order, uuid);
             return false;
         }
@@ -117,7 +113,7 @@ export class PaymentAFS extends PaymentInterface {
     }
 
     async _afsMakePaymentRequest(order, line, uuid) {
-        console.log("afsMakePaymentRequest: Starting payment request for line", line.cid);
+        console.log("afsMakePaymentRequest: Starting payment request for line", uuid);
         if (this.afs_transaction_in_progress) {
             console.warn("afsMakePaymentRequest: A transaction is already in progress.");
             return { status: 'error', message: 'Another transaction is already in progress.' };
@@ -150,12 +146,11 @@ export class PaymentAFS extends PaymentInterface {
                 return { status: 'polling' };
             } else {
                 console.error("afsMakePaymentRequest: Error from backend.", response);
-                this.afs_transaction_in_progress = false;
-                return { status: 'error', message: response.message };
+                this.afs_transaction_id = response.afs_transaction_id;
+                return { status: 'polling', message: response.message };
             }
         } catch (error) {
             console.error("afsMakePaymentRequest: RPC Error.", error);
-            this.afs_transaction_in_progress = false;
             return { status: 'error', message: 'Failed to connect to Odoo server.' };
         }
     }
@@ -182,13 +177,11 @@ export class PaymentAFS extends PaymentInterface {
             console.log("afsFetchPaymentStatus: Poll response received.", response);
 
             if (response.status === 'success') {
-                this.afs_transaction_in_progress = false;
                 return { status: 'success' };
             } else if (response.status === 'polling') {
                 return { status: 'polling' }; // Continue polling
             } else {
                 // Handle error, cancellation, etc.
-                this.afs_transaction_in_progress = false;
                 return { status: 'error', message: response.message };
             }
         } catch (error) {
@@ -209,8 +202,6 @@ export class PaymentAFS extends PaymentInterface {
         const data = {
             afs_transaction_id: this.afs_transaction_id,
         };
-
-        this.afs_transaction_in_progress = false; // Stop polling and allow new transactions
 
         try {
             const response = await this.orm.call(

@@ -38,6 +38,23 @@ class PosPaymentMethod(models.Model):
             mid=self.afs_mid,
             secure_key=self.afs_merchant_secure_key
         )
+    
+    def _validate_approval(self,response):
+        approved_str = response.get('PosRespText')
+        if "APPR" in str(approved_str).upper():
+            return True
+        else:
+            return False
+        
+
+    def _validate_cancellation(self,response):
+        web_response_status = response.get('WebResponseStatus')
+        if "SUCCESS" in str(web_response_status).upper():
+            return True
+        else:
+            return False
+
+        
 
     # --- AFS API Communication Methods ---
     def afs_make_payment_request(self, data):
@@ -57,8 +74,9 @@ class PosPaymentMethod(models.Model):
                 amount=data.get('amount'),
                 invoice_number=line_uuid
             )
+            print(response)
             # Your class should return a dict in the format the POS expects, including the line_uuid
-            if "APPROVAL" in response.get('PosRespText') and "Success" in response.get('WebResponseStatus'):
+            if self._validate_approval(response=response):
                 return { 'status' : 'success'}
             else:
                 return { 'status' : 'waiting', 'afs_transaction_id' : line_uuid }
@@ -81,7 +99,8 @@ class PosPaymentMethod(models.Model):
             response = afs_api.send_apex_enquiry(
                 reference_number=data.get('afs_transaction_id')
             )
-            if "APPROVAL" in response.get('PosRespText') and "Success" in response.get('WebResponseStatus'):
+            print(response)
+            if self._validate_approval(response=response):
                 return {'status': 'success'}
             else:
                 return {'status': 'polling',}
@@ -104,7 +123,8 @@ class PosPaymentMethod(models.Model):
         try:
             # Assuming your class has a 'cancel_payment' method
             response = afs_api.send_apex_cancellation()
-            if "Success" in response.get('WebResponseStatus'):
+            print(response)
+            if self._validate_cancellation(response=response):
                 return {'status': 'cancelled'}
             else:
                 return {'status': 'error', 'message': response.get('PosRespText')}

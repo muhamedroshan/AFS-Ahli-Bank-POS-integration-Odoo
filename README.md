@@ -1,1 +1,1 @@
-# AFS-Ahli-Bank-POS-integration-Odoo
+# AFS Ahli Bank POS integration Odoo
